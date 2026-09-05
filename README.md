@@ -9,6 +9,11 @@ The filtration model is fitted from whole-bundle prototype sweeps, not bench cou
 per layer, `log10PF = A·v^-α + C + B·v^β`, with `Δp = k·v`. Flow through a roll is radial,
 so face velocity falls as `v(r) = Q/(2πrH)` and both quantities are integrated over radius.
 
+Measurements and fitting notes live in `../testing/`. Constructed multi-material
+builds often underperform single-material-based predictions: measured PF has been
+about 0.5× predicted (roughly 2× overprediction, or 0.30 fewer log10 units).
+This is an observed, flow-dependent discrepancy, not a universal correction or bound.
+
 Everything runs in the browser. No backend, no data leaves the page.
 
 The optimiser searches material order, folds, quantities and geometry together with
