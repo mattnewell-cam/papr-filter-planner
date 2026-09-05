@@ -163,7 +163,9 @@ dialog button.close{background:var(--accent);color:#fff;border:none;border-radiu
 .step .sh{display:flex;align-items:center;gap:9px;margin-bottom:7px}
 .step .sh .sw{width:26px;height:26px;border-radius:5px;border:1px solid var(--swatch-ring);flex:none}
 .step .sh b{font-size:13px;font-weight:600}
-.step .sh .ord{margin-left:auto;font-size:10.5px;color:var(--ink-3)}
+.step .sh .ord{flex:none;width:20px;height:20px;border-radius:50%;background:var(--accent-soft);
+  color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+  display:flex;align-items:center;justify-content:center}
 .step p{margin:0 0 5px;font-size:12.5px;color:var(--ink-2)}
 .step p b{font-weight:600;color:var(--ink);font-family:"IBM Plex Mono",monospace}
 .core{background:var(--accent-soft);color:var(--accent-ink);border-radius:7px;padding:9px 11px;
@@ -634,7 +636,7 @@ function compute(){
 
   // build sequence
   document.getElementById('spec').innerHTML=
-    `<div class="core"><span class="lab">Start with</span><b class="mono">${(r.ri*20).toFixed(0)} mm</b> core — a tube or rolled card this diameter, ${r.H.toFixed(0)} cm long. Everything wraps around it.</div>`+
+    `<div class="core"><span class="lab">Start with</span><b class="mono">${(r.ri*20).toFixed(0)} mm</b> core — a tube or rolled card this diameter, ${r.H.toFixed(0)} cm long. Roll materials concentrically around it in the following order:</div>`+
     r.bands.map((b,i)=>{
     const m=b.m, fd=r.folds[m.id], n=b.n, turns=b.turns;
     const stripCm=Math.PI*(b.r0+b.r1)*turns;                  // strip length used, cm
@@ -643,7 +645,7 @@ function compute(){
       ? `Use it single — no folding.`
       : `Fold the <b>${foldSide} cm</b> side down to <b>${fd.axial.toFixed(0)} cm</b>, giving <b>${fd.f}</b> plies.`;
     const rollTxt = `Roll the <b>${fd.circ.toFixed(0)} cm</b> side on — <b>${num1(turns)}</b> turn${turns>1.02?'s':''}, using <b>${stripCm.toFixed(0)} cm</b> of its ${fd.circ.toFixed(0)} cm.`;
-    return `<div class="step"><div class="sh">${swSvg(m.id)}<b>${m.label} · ${m.sub}</b><span class="ord">${i===0?'innermost':i===r.bands.length-1?'outermost':'layer '+(i+1)}</span></div>
+    return `<div class="step"><div class="sh"><span class="ord">${i+1}</span>${swSvg(m.id)}<b>${m.label} · ${m.sub}</b></div>
       <p>${foldTxt}</p><p>${rollTxt}</p>${extrapChip(m,b,r)}
       <p style="color:var(--ink-3)">${num1(turns)} × ${fd.f} ply = ${num1(n)} layer${n>1.02?'s':''} · ${(b.r0*20).toFixed(0)}→${(b.r1*20).toFixed(0)} mm · ${logsOf(m,b.r0,b.r1,r.K).toFixed(2)} logs · ${dpOf(m,b.r0,b.r1,r.K).toFixed(0)} Pa</p></div>`;
   }).join('');
