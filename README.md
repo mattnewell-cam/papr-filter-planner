@@ -12,19 +12,24 @@ so face velocity falls as `v(r) = Q/(2πrH)` and both quantities are integrated 
 Everything runs in the browser. No backend, no data leaves the page.
 
 The optimiser searches material order, folds, quantities and geometry together with
-four deterministic differential-evolution populations, followed by local refinement.
+deterministic differential-evolution populations, followed by local refinement.
+For up to three materials, populations explore every material order explicitly;
+larger selections use four populations that evolve the order as well.
 It includes every allowed fold orientation, permits unused materials, and searches
 one contiguous band per material. Thick folded wraps use whole turns; thin wraps
 allow fractional turns. Scores and budgets come directly from the returned bands.
 Previous feasible plans are retained and rechecked after input changes.
 
 This is a bounded heuristic, not a proof of a global optimum. Run `node test-solver.cjs`
-for feasibility, repeatability, relaxed-budget and runtime regressions. The 19 quality
+for feasibility, repeatability, relaxed-budget and runtime regressions. The 20 quality
 cases must come within 0.006 log10 PF (about 1.4% PF) of longer-search references and
 each finish in under one second on the testing machine. The varied reference inputs
 in `solver-reference.json` were generated with random seed 123 and evaluated with
 eight populations of 1,000 generations; the seven standard cases used ten populations
-of 900 generations. These references are best-known feasible scores, not upper bounds.
+of 900 generations. Default and pressure-sensitivity references were strengthened
+using all six material orders and 1,200 generations per population after a pressure
+sensitivity miss revealed that longer runs alone could still converge to one order.
+These references are best-known feasible scores, not upper bounds.
 `node test-solver.cjs --legacy` also compares the previous solver's scores and times;
 its reported scores can include bands it subsequently removed.
 

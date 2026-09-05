@@ -246,6 +246,7 @@ dialog button.close{background:var(--accent);color:#fff;border:none;border-radiu
     <div class="sens" id="sensbox" hidden>
       <div class="lab">What another 10% buys you<span id="sensunit">Δlog₁₀PF · ×PF</span></div>
       <div id="sens"></div>
+      <div class="hint">Each row changes one input. Material rows add 10% to side A only. ×PF shows the change in protection factor.</div>
     </div>
     <div class="spec"><div class="lab" style="margin-bottom:10px">Build sequence · core outward</div><div id="spec"><div class="empty">Nothing selected yet.</div></div></div>
   </div>
@@ -396,13 +397,23 @@ function optimise(sel,dpMax,roMax,Hmax,fixedRi,quick){
   // Independent populations retain several basins instead of polishing only
   // the winner of a coarse geometry grid.
   const size=48, generations=quick?65:(n>4?300:180);
-  for(let island=0;island<4;island++){
+  // With a few materials, explicitly explore every order. Random-key evolution
+  // can otherwise converge all populations on the same order and miss a narrow
+  // competing solution when (for example) only the pressure limit is relaxed.
+  const permutations=a=>a.length?a.flatMap((v,i)=>permutations(a.filter((_,j)=>j!==i)).map(p=>[v,...p])):[[]];
+  const orders=n<=3?permutations(Array.from({length:n},(_,i)=>i)):[];
+  const setOrder=(x,island)=>{
+    if(orders.length) orders[island%orders.length].forEach((i,j)=>{x[3+3*i]=(j+.5)/n;});
+    return x;
+  };
+  for(let island=0;island<Math.max(4,orders.length);island++){
     const pop=[],scores=[];
     for(let j=0;j<size;j++){
       let x;
       if(j<12 && seeds.length) x=seeds[(j*7+island)%Math.min(seeds.length,100)].x.slice();
       else x=Array.from({length:dim},()=>random());
       if(j===0 && bestX) x=bestX.slice();
+      setOrder(x,island);
       pop.push(x);scores.push(evaluate(x));
     }
     for(let gen=0;gen<generations;gen++) for(let j=0;j<size;j++){
@@ -416,6 +427,7 @@ function optimise(sel,dpMax,roMax,Hmax,fixedRi,quick){
         const z=pop[a][k]+F*(pop[b][k]-pop[c][k]);
         return z<0?random()*pop[j][k]:z>1?pop[j][k]+random()*(1-pop[j][k]):z;
       });
+      setOrder(x,island);
       const score=evaluate(x);
       if(score>=scores[j]){pop[j]=x;scores[j]=score;}
     }

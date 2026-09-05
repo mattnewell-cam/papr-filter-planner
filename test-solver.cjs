@@ -19,6 +19,7 @@ const cases = [
   ['low pressure', ids(['grey fuzzy','grey holey','duvet']), 60],
   ['wide core', ids(['grey fuzzy','grey holey','duvet']), 202, 20, 50, 11],
   ['short', ids(['grey fuzzy','grey holey','duvet']), 202, 15, 15],
+  ['pressure sensitivity', ids(['grey fuzzy','grey holey','duvet']), 222.2],
 ];
 function check(t, sel, p=202, r=15, h=50, ri=null, q=3000) {
   assert(t && t.bands.length, 'expected a feasible plan');
@@ -50,7 +51,7 @@ function check(t, sel, p=202, r=15, h=50, ri=null, q=3000) {
 if(require.main===module){
   const legacy=process.argv.includes('--legacy') ? load(execFileSync('git',['show','f0b78245:src.html'],{cwd:__dirname,encoding:'utf8',maxBuffer:2e6})) : null;
   const refs=JSON.parse(fs.readFileSync(path.join(__dirname,'solver-reference.json'),'utf8'));
-  const references=[2.384895,3.336411,1.059105,1.406569,1.629367,1.429863,1.695636];
+  const references=[2.390406,3.336411,1.059105,1.406569,1.629367,1.429863,1.695636,2.450671];
   let worstMs=0;
   for(const [i,[name,...args]] of [...cases,...refs.map((r,i)=>[`varied ${i}`,...r.args])].entries()){
     const start=performance.now(), t=solver.solve(...args), ms=performance.now()-start;
@@ -64,6 +65,9 @@ if(require.main===module){
   }
   assert(worstMs<1000, `slowest solve ${worstMs.toFixed(0)} ms exceeds one second`);
   const sel=cases[0][1], base=solver.solve(sel), seed=structuredClone(solver.seed());
+  assert(base.logs>=2.390,'default solve missed the competing material order');
+  const pressure=solver.solve(sel,222.2,15,50,null,3000,seed);
+  assert(pressure.logs-base.logs>.059,'pressure sensitivity missed the order/core change');
   assert.equal(solver.solve(sel.slice().reverse()).logs,base.logs,'input order changed solution');
   const relaxed=[
     [sel,222.2,15,50], [sel,202,16.5,50], [sel,202,15,55],
