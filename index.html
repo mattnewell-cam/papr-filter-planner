@@ -301,225 +301,160 @@ function foldAll(m,H,rOut){
   }
   return out;
 }
-/* Candidate folds worth trying. Below TURN_MIN a wrap can stop part-way through a turn,
- * so extra plies are pure gain and the most-cloth fold simply wins - one candidate. At
- * or above TURN_MIN the wrap only goes on in whole turns, so more plies buys cloth at
- * the cost of granularity and those ply counts genuinely have to be searched. */
-function foldChoices(m,H,rOut){
-  const all=foldAll(m,H,rOut);
-  if(!all.length) return [];
-  const perPly=new Map();                       // best axis for each ply count
-  for(const c of all){ const b=perPly.get(c.f); if(!b||c.stock>b.stock) perPly.set(c.f,c); }
-  const opts=[...perPly.values()];
-  const fine=opts.filter(c=>c.f*m.t<TURN_MIN).sort((a,b)=>b.stock-a.stock)[0];
-  const coarse=opts.filter(c=>c.f*m.t>=TURN_MIN).sort((a,b)=>b.stock-a.stock);
-  return [...(fine?[fine]:[]),...coarse];
-}
-function foldFor(m,H,rOut){ const c=foldChoices(m,H,rOut); return c.length?c[0]:null; }
-
 /* ---- optimiser ---- */
-/* A part-turn leaves a sector of the circumference thinner than the rest, and because
- * penetration is area-weighted the thin sector dominates. For a thick wrap that matters:
- * 3 layers over 1.3 turns is worth much less than 4 layers over 1 turn, so anything
- * whose folded thickness is >= TURN_MIN goes on in whole turns only. Below that the
- * step is fine enough that a part-turn is a fair approximation, and allowing it beats
- * discarding the leftover cloth. */
-const TURN_MIN=1.0;                                   // cm of folded wrap thickness
-const stepOf=(m,f)=> f*m.t>=TURN_MIN ? f*m.t : Math.min(f*m.t,0.05);
-function build(sel,H,ri,dpMax,roMax,lam,rGuess,pick){
-  const K=Q/(2*Math.PI*H);
-  const stock={}, used={}, folds={}, bandsArr=[];
-  const rFold = rGuess||roMax;
-  for(const m of sel){
-    const p=pick&&pick[m.id];
-    const fd = p ? (foldAll(m,H,rFold).find(c=>c.f===p.f&&c.roll===p.roll)||foldFor(m,H,rFold)) : foldFor(m,H,rFold);
-    if(!fd||!(fd.stock>0)) return null; folds[m.id]=fd; stock[m.id]=fd.stock; used[m.id]=0; }
-  let r=ri, logs=0, dp=0, cur=null, guard=0;
-  while(r<roMax-1e-9 && guard++<4000){
-    const v=K/r; let pick=null,bestv=-Infinity,pickR2=0;
-    for(const m of sel){
-      const r2=r+stepOf(m,folds[m.id].f);
-      if(r2>roMax+1e-9) continue;                                  // it must fit inside the OD
-      if(stock[m.id]-used[m.id] < Math.PI*(r2*r2-r*r)/m.t) continue; // cloth left for it
-      if(dp+dpOf(m,r,r2,K)>dpMax) continue;                        // pressure for it
-      const val=aOf(m,v)-lam*bOf(m)*v;
-      if(val>bestv){bestv=val;pick=m;pickR2=r2;}
-    }
-    if(!pick || bestv<=0) break;
-    const r2=pickR2;
-    logs+=logsOf(pick,r,r2,K); dp+=dpOf(pick,r,r2,K);
-    used[pick.id]+=Math.PI*(r2*r2-r*r)/pick.t;
-    if(cur&&cur.m===pick){cur.r1=r2;} else {cur={m:pick,r0:r,r1:r2};bandsArr.push(cur);}
-    r=r2;
-  }
-  let merged=[];
-  for(const b of bandsArr){ const last=merged[merged.length-1];
-    if(last && last.m===b.m){last.r1=b.r1;} else merged.push({...b}); }
-  // A band under one layer thick is a build instruction nobody can follow. Drop it and
-  // pull everything outside it inward by its thickness - each surviving band keeps its
-  // own thickness, so no material is asked to stretch past its stock; the bundle just
-  // finishes a little narrower.
-  for(let pass=0;pass<3;pass++){
-    const i=merged.findIndex(b=>(b.r1-b.r0)/b.m.t<1);
-    if(i<0||merged.length<2) break;
-    const gap=merged[i].r1-merged[i].r0;
-    merged.splice(i,1);
-    for(let j=i;j<merged.length;j++){ merged[j].r0-=gap; merged[j].r1-=gap; }
-    const re=[]; for(const b of merged){ const l=re[re.length-1];
-      if(l&&l.m===b.m) l.r1=b.r1; else re.push(b); } merged=re;
-  }
-  if(merged.length) r=merged[merged.length-1].r1;
-  for(const b of merged){ b.n=(b.r1-b.r0)/b.m.t; b.turns=b.n/folds[b.m.id].f; }
-  return {logs,dp,ri,ro:r,H,K,bands:merged,used,stock,folds,rFold};
-}
-/* Search over subsets as well as geometry. Offering a material must never make the
- * answer worse - the planner can always decline to use it - and the greedy alone will
- * happily spend scarce radial depth on a weak material when the diameter budget binds.
- *
- * A looser constraint can only enlarge the feasible set, so a worse answer after
- * loosening one is search noise, not physics. Two defences: a much finer grid (this
- * runs behind a button, so it can afford it), and seeding each run with the exact
- * geometry of the previous answer, which stays feasible when constraints relax. */
-const LAM_LADDER=[0,.004,.008,.015,.03,.05,.09,.15,.25,.4,.65,1,1.6,2.6,4];
-let LAST=null;                                   // {ids,H,ri,lam} from the previous solve
+// Thick folded wraps need complete turns; thin wraps allow partial turns.
+const TURN_MIN=1.0;
+let LAST=null;
 
-/* roCap: a plan may deliberately stop short of the diameter budget. Going wider forces
- * a narrower fold (axial >= H + outer radius) and so cuts the usable stock, which would
- * otherwise let a looser budget produce a worse answer. */
-const tieOK=(t,H)=>t.bands.every(b=>t.folds[b.m.id].axial>=H+t.ro-1e-9);
-function bestFor(sel,lim,His,RIs,lams,caps,pick){
-  const {dpMax,Hmax,fixedRi}=lim; let best=null;
-  for(const roMax of (caps||[lim.roMax])) for(const H of His) for(const ri of RIs){
-    if(ri>=roMax-0.3) continue;
-    for(const lam of lams){
-      // Folds are limited by axial >= H + outer radius, so sizing them against the
-      // diameter *budget* would make a looser budget cut the usable stock. Iterate to
-      // the radius the build actually reaches instead.
-      let t=null,g=ri;
-      for(let it=0;it<4;it++){
-        const u=build(sel,H,ri,dpMax,roMax,lam,g,pick);
-        if(!u||!u.bands.length) break;
-        t=u; if(Math.abs(u.ro-g)<0.05) break; g=u.ro;
-      }
-      if(t){ const v=build(sel,H,ri,dpMax,roMax,lam,t.ro,pick); if(v&&v.bands.length) t=v; }
-      for(let it=0;it<3&&t&&t.bands.length&&!tieOK(t,H);it++){
-        const v=build(sel,H,ri,dpMax,roMax,lam,t.ro,pick); t=(v&&v.bands.length)?v:null;
-      }
-      if(!t||!t.bands.length||!tieOK(t,H)) continue;
-      if(!best||t.logs>best.logs){ best=t; best._H=H; best._ri=ri; best._lam=lam; best._cap=roMax; best._pick=pick; }
-    }
-  }
-  return best;
-}
-const CAPS=r=>[r,r*.9,r*.8,r*.7,r*.6];
-function thickPicks(sub,H,rOut){
-  let combos=[undefined];
-  for(const m of sub){
-    const opts=foldChoices(m,H,rOut).filter(c=>c.f*m.t>=TURN_MIN).slice(0,4);
-    if(opts.length<2) continue;                       // nothing quantised to choose between
-    const nx=[];
-    for(const c of combos) for(const o of opts) nx.push({...(c||{}),[m.id]:{f:o.f,roll:o.roll}});
-    combos=[...combos,...nx];
-    if(combos.length>12){ combos=combos.slice(0,12); break; }
-  }
-  return combos;
-}
-const grid=(lo,hi,n)=>{const a=[];for(let i=0;i<n;i++)a.push(lo+(hi-lo)*i/(n-1));return a;};
-/* Comparative-only solve for the "another 10%" panel: one grid, no subset search.
-   Cheap enough to run seven times per solve; not used for the headline number. */
+/* Search actual build instructions, not a radius-by-radius greedy score. Each
+ * material has a fold, position and amount; zero amount excludes it. This keeps
+ * every material and fold in the search, including discontinuous whole turns.
+ * A fixed evaluation budget and seeded randomness make cold solves repeatable.
+ */
 function optimise(sel,dpMax,roMax,Hmax,fixedRi,quick){
-  if(!sel.length) return null;
-  const lim={dpMax,roMax,Hmax,fixedRi};
-  const riAll = fixedRi?[fixedRi]:[.9,1.1,1.35,1.6,1.9,2.2,2.6,3,3.4,3.9,4.5,5.2,6,7,8,9.5];
-  const n=sel.length, subsets=[];
-  for(let mask=(1<<n)-1;mask>=1;mask--) subsets.push(sel.filter((_,i)=>mask&(1<<i)));
-
-  // 1. rank subsets on a coarse grid. In quick mode (the sensitivity panel) skip this
-  //    and take the subset the real answer used - the variants differ from it by 10%.
-  let ranked;
-  if(quick){
-    const prev=LAST?sel.filter(m=>LAST.ids.includes(m.id)):[];
-    ranked=[{sub:sel}]; if(prev.length&&prev.length!==sel.length) ranked.push({sub:prev});
-  }else{
-    const cH=grid(Math.min(9,Hmax),Hmax,6), cRI=fixedRi?[fixedRi]:[1.1,1.9,2.6,3.4,4.5,6,8];
-    ranked=[];
-    for(const sub of subsets.slice(0,64)){
-      const t=bestFor(sub,lim,cH,cRI,[0,.03,.12,.4,1.2],[roMax]);
-      if(t) ranked.push({sub,logs:t.logs});
+  if(!sel.length || ![dpMax,roMax,Hmax,Q].every(v=>Number.isFinite(v)&&v>0)) return null;
+  sel=sel.slice().sort((a,b)=>a.id.localeCompare(b.id));
+  if(sel.some(m=>![m.t,m.k,m.L,m.W].every(v=>Number.isFinite(v)&&v>0))) return null;
+  const minRi=Math.min(.5,roMax/10), maxRi=roMax-Math.min(...sel.map(m=>m.t));
+  if(maxRi<=minRi || (fixedRi && (fixedRi<=0 || fixedRi>=roMax))) return null;
+  const n=sel.length, dim=3+3*n;
+  const all=sel.map(m=>foldAll(m,0,0));
+  const clamp=x=>Math.max(0,Math.min(1,x));
+  let rng=0x9e3779b9;
+  const random=()=>{rng^=rng<<13;rng^=rng>>>17;rng^=rng<<5;return (rng>>>0)/4294967296;};
+  let best=null, bestX=null;
+  const evaluate=(x,save=false)=>{
+    const H=Math.max(Math.min(.01,Hmax),x[0]*Hmax), ri=fixedRi||minRi+x[1]*(maxRi-minRi);
+    const cap=ri+x[2]*(roMax-ri), need=H+cap, K=Q/(2*Math.PI*H);
+    let r=ri, dp=0, logs=0;
+    const order=Array.from({length:n},(_,i)=>i).sort((i,j)=>x[3+3*i]-x[3+3*j]);
+    const bands=[], folds={}, used={}, stock={};
+    for(const i of order){
+      const m=sel[i], amount=clamp((x[5+3*i]-.08)/.84);
+      if(amount===0) continue;
+      const opts=all[i].filter(f=>f.axial>=need-1e-10);
+      if(!opts.length) continue;
+      const f=opts[Math.min(opts.length-1,Math.floor(x[4+3*i]*opts.length))];
+      const available=Math.min(cap-r,Math.sqrt(r*r+f.stock*m.t/Math.PI)-r,
+        r*Math.expm1(Math.min(700,(dpMax-dp)*m.t/(m.k*K))));
+      let depth=Math.max(0,available)*amount;
+      if(f.f*m.t>=TURN_MIN) depth=Math.floor((depth+1e-10)/(f.f*m.t))*f.f*m.t;
+      if(depth<m.t-1e-9) continue;
+      const r1=r+depth;
+      logs+=logsOf(m,r,r1,K); dp+=dpOf(m,r,r1,K);
+      if(save){
+        folds[m.id]={...f,need}; stock[m.id]=f.stock;
+        used[m.id]=Math.PI*(r1*r1-r*r)/m.t;
+        bands.push({m,r0:r,r1,n:depth/m.t,turns:depth/(m.t*f.f)});
+      }
+      r=r1;
     }
-    ranked.sort((a,b)=>b.logs-a.logs);
-  }
-  if(!ranked.length) return null;
-
-  // 2. refine the promising ones properly
-  const fH=grid(Math.min(7,Hmax),Hmax,quick?7:17);
-  const rIn=quick?riAll.filter((_,i)=>i%3===0):riAll;
-  let best=null;
-  for(const {sub} of ranked.slice(0,quick?2:4)){
-    const caps=quick?[roMax,roMax*.8]:[roMax,roMax*.88,roMax*.75,roMax*.62];
-    for(const pk of thickPicks(sub,Hmax,roMax*.75)){
-      const t=bestFor(sub,lim,fH,rIn,LAM_LADDER,caps,pk);
-      if(t&&(!best||t.logs>best.logs)) best=t;
+    if(save) return logs>0?{H,ri,ro:r,K,dp,logs,bands,folds,stock,used,rFold:cap}:null;
+    if(logs>0 && (!best || logs>best.logs)) {best={logs};bestX=x.slice();}
+    return logs;
+  };
+  const seeds=[];
+  const remember=x=>{const score=evaluate(x);seeds.push({x,score});};
+  // Sample every fold in isolation, at its exact axial boundary as well as the
+  // length limit. These seeds protect small subsets from larger selections.
+  for(let i=0;i<n;i++) for(const f of all[i]){
+    for(const rf of [.06,.2,.45,.7]) for(const hf of [1,.7]){
+      const ri=fixedRi||minRi+rf*(maxRi-minRi);
+      const cap=Math.min(roMax,Math.max(ri+sel[i].t, f.axial*0.3));
+      const H=Math.min(Hmax,f.axial-cap)*hf;
+      if(H<=0) continue;
+      const x=new Array(dim).fill(0); x[0]=H/Hmax;x[1]=rf;x[2]=(cap-ri)/(roMax-ri);
+      const opts=all[i].filter(o=>o.axial>=H+cap-1e-10), k=opts.indexOf(f);
+      if(k<0) continue;
+      x[4+3*i]=(k+.5)/opts.length; x[5+3*i]=1;
+      remember(x);
     }
   }
-  // 3. local polish around the winner, including alternative folds
-  if(best){
-    const H0=best._H, r0=best._ri, dH=Hmax/40;
-    const pH=[H0-2*dH,H0-dH,H0,H0+dH,H0+2*dH].filter(h=>h>2&&h<=Hmax);
-    const pRI=fixedRi?[fixedRi]:[r0*.85,r0*.93,r0,r0*1.07,r0*1.15].filter(x=>x>.5);
-    const sub=best.bands.map(b=>b.m).filter((v,i,a)=>a.indexOf(v)===i);
-    const t=bestFor(sub,lim,pH,pRI,LAM_LADDER,CAPS(roMax));
-    if(t&&t.logs>best.logs) best=t;
+  // Preserve an actual previous plan, re-evaluated with today's materials and
+  // airflow. A looser limit must not lose an already feasible solution.
+  let incumbent=null;
+  if(LAST && LAST.bands && LAST.H<=Hmax && (!fixedRi || fixedRi===LAST.ri)){
+    const map=new Map(sel.map(m=>[m.id,m])), folds={},stock={},used={},bands=[];
+    let logs=0,dp=0,r=LAST.ri,valid=r>0;
+    const K=Q/(2*Math.PI*LAST.H);
+    for(const b of LAST.bands){
+      const m=map.get(b.id), prev=LAST.folds[b.id];
+      if(!m || m.t!==b.t || !prev){valid=false;break;}
+      const f=foldAll(m,LAST.H,LAST.ro).find(f=>f.f===prev.f&&f.roll===prev.roll);
+      if(!f){valid=false;break;}
+      const r1=r+b.depth;
+      used[m.id]=(used[m.id]||0)+Math.PI*(r1*r1-r*r)/m.t;
+      if(used[m.id]>f.stock+1e-7){valid=false;break;}
+      logs+=logsOf(m,r,r1,K);dp+=dpOf(m,r,r1,K);
+      bands.push({m,r0:r,r1,n:b.depth/m.t,turns:b.depth/(m.t*f.f)});
+      folds[m.id]=f;stock[m.id]=f.stock;r=r1;
+    }
+    if(valid && bands.length && r<=roMax+1e-8 && dp<=dpMax+1e-7)
+      incumbent={H:LAST.H,ri:LAST.ri,ro:r,K,logs,dp,bands,folds,stock,used,rFold:r};
   }
-  // 4. the previous answer is still feasible when constraints loosen - never go backwards
-  if(LAST){
-    const sub=sel.filter(m=>LAST.ids.includes(m.id));
-    if(sub.length===LAST.ids.length){
-      const cap=[Math.min(LAST.cap||roMax,roMax)];
-      for(const pk of [LAST.pick,undefined]){
-        const t=bestFor(sub,lim,[LAST.H],[fixedRi||LAST.ri],LAM_LADDER,cap,pk);
-        if(t&&(!best||t.logs>best.logs)) best=t;
+  seeds.sort((a,b)=>b.score-a.score);
+  // Independent populations retain several basins instead of polishing only
+  // the winner of a coarse geometry grid.
+  const size=48, generations=quick?65:(n>4?300:180);
+  for(let island=0;island<4;island++){
+    const pop=[],scores=[];
+    for(let j=0;j<size;j++){
+      let x;
+      if(j<12 && seeds.length) x=seeds[(j*7+island)%Math.min(seeds.length,100)].x.slice();
+      else x=Array.from({length:dim},()=>random());
+      if(j===0 && bestX) x=bestX.slice();
+      pop.push(x);scores.push(evaluate(x));
+    }
+    for(let gen=0;gen<generations;gen++) for(let j=0;j<size;j++){
+      let a,b,c;
+      do{a=Math.floor(random()*size);}while(a===j);
+      do{b=Math.floor(random()*size);}while(b===j||b===a);
+      do{c=Math.floor(random()*size);}while(c===j||c===a||c===b);
+      const forced=Math.floor(random()*dim), F=.45+random()*.45;
+      const x=pop[j].map((v,k)=>{
+        if(k!==forced && random()>.8) return v;
+        const z=pop[a][k]+F*(pop[b][k]-pop[c][k]);
+        return z<0?random()*pop[j][k]:z>1?pop[j][k]+random()*(1-pop[j][k]):z;
+      });
+      const score=evaluate(x);
+      if(score>=scores[j]){pop[j]=x;scores[j]=score;}
+    }
+    const finalists=scores.map((score,j)=>({score,x:pop[j]})).sort((a,b)=>b.score-a.score);
+    seeds.push(...finalists.slice(0,6));
+  }
+  // Coordinate polish includes categorical fold/order jumps, then shrinking
+  // geometric steps; fractions are continuous only for thin folded wraps.
+  seeds.push({x:bestX,score:best?.logs||0});
+  seeds.sort((a,b)=>b.score-a.score);
+  for(const s of seeds.slice(0,8)){
+    if(!s.x) continue;
+    let x=s.x.slice(), score=evaluate(x);
+    for(const step of [.08,.03,.01,.003,.001,.0003,.0001]){
+      for(let pass=0;pass<4;pass++){
+        const before=score;
+        for(let k=0;k<dim;k++){
+          if(k===1 && fixedRi) continue;
+          const values=[clamp(x[k]-step),clamp(x[k]+step)];
+          if(k>=3 && (k-3)%3===1){
+            const i=(k-4)/3, H=Math.max(.01,x[0]*Hmax),ri=fixedRi||minRi+x[1]*(maxRi-minRi);
+            const count=all[i].filter(f=>f.axial>=H+ri+x[2]*(roMax-ri)-1e-10).length;
+            for(let j=0;j<count;j++) values.push((j+.5)/count);
+          } else if(k>=3) values.push(0,1);
+          for(const v of values){
+            const trial=x.slice();trial[k]=v;
+            const sc=evaluate(trial);
+            if(sc>score+1e-12){x=trial;score=sc;}
+          }
+        }
+        if(score<=before+1e-12) break;
       }
     }
   }
-  // 5. fine local search, from wherever the best point now is around the winner: the coarse grids can miss a core radius or
-  //    diameter cap by a few mm, which is enough to change how a thick piece folds
-  if(best){
-    for(let round=0;round<5;round++){
-      const H0=best._H,r0=best._ri,c0=best._cap,l0=best._lam,sub=best.bands.map(b=>b.m).filter((v,i,a)=>a.indexOf(v)===i);
-      // additive as well as multiplicative steps: near a small core a 10% step is
-      // several millimetres, and a few millimetres of core radius is enough to change
-      // how many whole turns a thick wrap gets
-      const nH=[H0-1,H0-.5,H0,H0+.5,H0+1].filter(h=>h>2&&h<=Hmax);
-      const nRI=fixedRi?[fixedRi]:[r0-.22,r0-.11,r0,r0+.11,r0+.22,r0*1.15].filter(x=>x>.5);
-      const nC=[c0*.94,c0*.97,c0,Math.min(c0*1.05,roMax)].filter(c=>c<=roMax+1e-9);
-      const li=LAM_LADDER.indexOf(l0), nL=li<0?LAM_LADDER:LAM_LADDER.slice(Math.max(0,li-2),li+3);
-      const opts=sub.map(m=>{
-        const seen=new Set(), out=[];
-        for(const rr of [best.ro,best._cap]) for(const c of foldChoices(m,H0,rr)){
-          const k=c.f+c.roll; if(!seen.has(k)){ seen.add(k); out.push({f:c.f,roll:c.roll}); } }
-        return out;});
-      // one material's fold at a time, not every combination: the product blows up and
-      // capping it drops the last material's options altogether. Repeated rounds get
-      // the same reach for a fraction of the work.
-      const cur=Object.fromEntries(Object.entries(best.folds).map(([k,v])=>[k,{f:v.f,roll:v.roll}]));
-      const combos=[cur];
-      for(let i=0;i<sub.length;i++){
-        const id=sub[i].id;
-        for(const o of opts[i]) if(!cur[id]||o.f!==cur[id].f||o.roll!==cur[id].roll) combos.push({...cur,[id]:o});
-      }
-      let improved=false;
-      for(const pk of combos){
-        const u=bestFor(sub,lim,nH,nRI,nL,nC,pk);
-        if(u&&u.logs>best.logs+1e-9){ best=u; improved=true; }
-      }
-      if(!improved) break;
-    }
-  }
-
-  if(quick) return best;                       // variants must not overwrite the seed
-  if(best) LAST={ids:[...new Set(best.bands.map(b=>b.m.id))],H:best._H,ri:best._ri,lam:best._lam,cap:best._cap,
-                  pick:Object.fromEntries(Object.entries(best.folds).map(([k,v])=>[k,{f:v.f,roll:v.roll}]))};
+  best=bestX?evaluate(bestX,true):null;
+  if(incumbent && (!best || incumbent.logs>best.logs)) best=incumbent;
+  if(best && !quick) LAST={H:best.H,ri:best.ri,ro:best.ro,
+    folds:Object.fromEntries(Object.entries(best.folds).map(([id,f])=>[id,{f:f.f,roll:f.roll}])),
+    bands:best.bands.map(b=>({id:b.m.id,t:b.m.t,depth:b.r1-b.r0}))};
   return best;
 }
 </script>
@@ -543,9 +478,8 @@ const MATS = [
 const byId = Object.fromEntries(MATS.map(m=>[m.id,m]));
 
 /* ---- solver workers ---------------------------------------------------------
- * The panel needs eight more solves than the headline answer and a full solve is
- * seconds, not milliseconds. Run them in workers off the one solver script above:
- * full accuracy, in parallel, without freezing the page. The seed rides in the
+ * The panel needs several more solves than the headline answer. Run them in
+ * workers off the same solver script, without freezing the page. The seed rides in the
  * message so a worker's own LAST can never leak from one job into the next. */
 const WORKER_SRC = document.getElementById('solvercore').textContent + `
 onmessage = e => {
@@ -569,6 +503,9 @@ const POOL_MAX = Math.max(1, Math.min(8, (navigator.hardwareConcurrency||4)-1));
  * promise simply never settles, which is exactly the cancel we want. */
 let mainWorker=null;
 function solveAsync(sel,dpMax,roMax,Hmax,fixedRi,q,seed){
+  // Outdated sensitivity jobs must not compete with the new headline solve.
+  sensRun++;
+  if(sensPool){sensPool.forEach(w=>w.terminate());sensPool=null;}
   if(mainWorker) mainWorker.terminate();
   const w = mainWorker = solverPool(1)[0];
   return new Promise(res=>{
