@@ -10,8 +10,8 @@ per layer, `log10PF = A·v^-α + C + B·v^β`, with `Δp = k·v`. Flow through a
 so face velocity falls as `v(r) = Q/(2πrH)` and both quantities are integrated over radius.
 
 Measurements and fitting notes live in `../testing/`. Constructed multi-material
-builds often underperform single-material-based predictions: measured PF has been
-about 0.5× predicted (roughly 2× overprediction, or 0.30 fewer log10 units).
+builds often underperform single-material-based predictions: measured PF can be
+about half the predicted PF.
 This is an observed, flow-dependent discrepancy, not a universal correction or bound.
 
 Everything runs in the browser. No backend, no data leaves the page.
