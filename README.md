@@ -5,7 +5,7 @@ household blankets and towels.
 
 | Resource | Contents |
 |---|---|
-| [Live planner](https://mattnewell-cam.github.io/papr-filter/) | Choose materials, airflow, pressure and size limits to calculate a proposed rolled-filter build. |
+| [Live planner](https://mattnewell-cam.github.io/papr-filter/planner/) | Choose materials, airflow, pressure and size limits to calculate a proposed rolled-filter build. |
 | [Planner source](planner/README.md) | Browser app, build script, solver tests, reference cases and material photographs. |
 | [Filter theory](THEORY.md) | Pressure-budget allocation, material mixing and bundle geometry. |
 | [Measured results](testing/RESULTS.md) | Published material fits, test conditions and model limitations. |
@@ -42,9 +42,8 @@ python planner/build.py
 node planner/test-solver.cjs
 ```
 
-Edit `planner/src.html`. The build generates both `planner/index.html` and the root
-`index.html`, preserving the existing GitHub Pages URL. GitHub Pages serves the
-repository root on `main`.
+Edit `planner/src.html`. The build generates `planner/index.html`.
+GitHub Pages serves the repository root on `main`; the app is at `/papr-filter/planner/`.
 
 `testing/fill_sheet.gs` is a historical Apps Script for the superseded flat-sheet
 bench analysis, retained for provenance. Current fits use the whole-bundle prototype

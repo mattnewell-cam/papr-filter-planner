@@ -30,6 +30,4 @@ out = f"""<!doctype html>
 </html>
 """
 io.open(os.path.join(here, 'index.html'), 'w', encoding='utf-8').write(out)
-# Keep the original GitHub Pages entry point when this repo includes testing/theory.
-io.open(os.path.join(here, '..', 'index.html'), 'w', encoding='utf-8').write(out)
 print(f'index.html  {len(out)//1024} KB')

@@ -44,7 +44,7 @@ its reported scores can include bands it subsequently removed.
 ## Editing
 
 `src.html` is the source. `index.html` is generated — don't edit it directly.
-The build also writes `../index.html` to preserve the original GitHub Pages URL.
+The planner is published at https://mattnewell-cam.github.io/papr-filter/planner/.
 Run these commands from `planner/`:
 
 ```
