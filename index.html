@@ -161,7 +161,10 @@ dialog button.close{background:var(--accent);color:#fff;border:none;border-radiu
 .srow b{font-family:"IBM Plex Mono",monospace;font-weight:500;text-align:right;font-size:12px;white-space:nowrap}
 .srow b em{font-style:normal;opacity:.65;margin-left:5px}
 .srow b.up{color:var(--ok)} .srow b.dn{color:var(--crit)} .srow b.flat{color:var(--ink-3)}
-.snote{font-size:11.5px;color:var(--ink-3);margin-top:9px}
+.sens .lab{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.sens .lab #sensunit{text-transform:none;letter-spacing:0;font-weight:400;opacity:.7;
+  font-family:"IBM Plex Mono",monospace;font-size:10px}
+.srow b.flat{font-size:11.5px}
 .spec{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
 .step{border-top:1px solid var(--line-soft);padding:13px 0}
 .step:first-of-type{border-top:none;padding-top:4px}
@@ -239,7 +242,7 @@ dialog button.close{background:var(--accent);color:#fff;border:none;border-radiu
       <div class="legend" id="legend"></div>
     </div>
     <div class="sens" id="sensbox" hidden>
-      <div class="lab">What another 10% buys you</div>
+      <div class="lab">What another 10% buys you<span id="sensunit">Δlog₁₀PF · ×PF</span></div>
       <div id="sens"></div>
     </div>
     <div class="spec"><div class="lab" style="margin-bottom:10px">Build sequence · core outward</div><div id="spec"><div class="empty">Nothing selected yet.</div></div></div>
@@ -672,16 +675,18 @@ function runSens(sel,lim,base){
   ];
   const done=[];
   const draw=()=>{
-    const gains=done.filter(r=>r.d>0.004&&!r.neg).sort((a,b)=>b.d-a.d);
+    const gains=done.filter(r=>!r.neg).sort((a,b)=>b.d-a.d);
     const cost=done.find(r=>r.neg);
     const span=Math.max(.02,...done.map(r=>Math.abs(r.d)));
-    const line=r=>`<div class="srow"><div class="nm">${r.img?`<span class="sw" style="background-image:url('${IMG[r.img]}')"></span>`:''}<span>${r.label}</span></div>
-      <div class="track"><i class="${r.neg?'neg':''}" style="width:${Math.min(100,100*Math.abs(r.d)/span)}%"></i></div>
-      <b class="${r.d>0.004?'up':r.d<-0.004?'dn':'flat'}">${r.d>0?'+':''}${r.d.toFixed(2)} log<em>×${Math.pow(10,r.d).toFixed(2)}</em></b></div>`;
-    el.innerHTML=(gains.length?gains.map(line).join('')
-        :(done.length>=jobs.length?'<div class="snote">Nothing gains from 10% more — the build is limited by something else.</div>':''))
-      +(cost?line(cost):'')
-      +`<div class="snote">Change in log₁₀PF from a 10% increase in each.${done.length<jobs.length?' Still checking…':''}</div>`;
+    const line=r=>{
+      const flat=Math.abs(r.d)<0.005;
+      return `<div class="srow"><div class="nm">${r.img?`<span class="sw" style="background-image:url('${IMG[r.img]}')"></span>`:''}<span>${r.label}</span></div>
+      <div class="track">${flat?'':`<i class="${r.neg?'neg':''}" style="width:${Math.min(100,100*Math.abs(r.d)/span)}%"></i>`}</div>
+      <b class="${r.d>0.004?'up':r.d<-0.004?'dn':'flat'}">${flat?'no change'
+        :`${r.d>0?'+':''}${r.d.toFixed(2)}<em>×${Math.pow(10,r.d).toFixed(2)}</em>`}</b></div>`;};
+    el.innerHTML=gains.map(line).join('')+(cost?line(cost):'');
+    document.getElementById('sensunit').textContent=
+      done.length<jobs.length?'checking…':'Δlog₁₀PF · ×PF';
   };
   draw();
   const step=i=>{
@@ -691,7 +696,11 @@ function runSens(sel,lim,base){
     Q = j.flow ? Q0*1.1 : Q0;
     const t=optimise(j.sel||sel,(j.lim||lim).dpMax,(j.lim||lim).roMax,(j.lim||lim).Hmax,(j.lim||lim).fixedRi,true);
     Q=Q0;
-    if(t&&t.bands.length) done.push({label:j.label,img:j.img,neg:j.neg,d:t.logs-base});
+    // Loosening a budget or adding cloth can only enlarge the feasible set, so a
+    // negative here is the quick solver's search noise, not physics. Only the airflow
+    // row is a genuine cost.
+    if(t&&t.bands.length) done.push({label:j.label,img:j.img,neg:j.neg,
+      d:j.neg?(t.logs-base):Math.max(0,t.logs-base)});
     draw();
     setTimeout(()=>step(i+1),0);
   };
