@@ -1,4 +1,4 @@
-# Blanket Filter Planner
+# PAPR Filter Planner
 
 Pick the blankets and towels you actually own, give a pressure budget, an airflow target
 and the space you have, and it returns a rolled-filter build spec that maximises
