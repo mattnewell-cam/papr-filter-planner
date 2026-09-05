@@ -1,0 +1,7 @@
+numpy
+scipy
+openpyxl
+matplotlib
+plotly
+kaleido
+Pillow

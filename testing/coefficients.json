@@ -1,0 +1,104 @@
+{
+  "_note": "Per-layer fits.  log10PF per layer = D*v**-alpha + C + B*v**beta   (B/beta absent where no impaction term is used);  dp per layer = k_layer*v.  v in cm/s, dp in Pa, t_layer in cm.  alpha is capped at 2/3 (diffusion), beta at 1.0 (impaction). See RESULTS.md for the fit-selection rules.",
+  "grey holey": {
+    "D": 0.04345,
+    "C": 0.0,
+    "alpha": 0.158,
+    "k_layer": 0.8921,
+    "t_layer": 0.20149,
+    "source": "2-ply prototype series, built C=37.0, H=54, rolled along the 173 cm side; blanket 173 x 137 cm; t from a solid 4-ply roll along the 137 cm side, C=37.25 -> ID 70.7 mm, 11.69 layers",
+    "v_lo": 1.16,
+    "v_hi": 4.63,
+    "caveat": "C pinned at 0; alpha 0.158 is the constrained best fit (R2 0.995, vs 0.976 at 2/3)",
+    "product": "https://www.ikea.com/gb/en/p/sandbrodd-throw-anthracite-00562038/",
+    "size_cm": [
+      173,
+      137
+    ]
+  },
+  "duvet": {
+    "D": 0.10057,
+    "C": 0.01677,
+    "B": 0.01203,
+    "alpha": 0.6667,
+    "beta": 1.0,
+    "k_layer": 3.0829,
+    "t_layer": 1.95159,
+    "v_lo": 0.66,
+    "v_hi": 4.76,
+    "r2": 0.9624,
+    "worst_v": 2.8,
+    "source": "rows 89-94 (full length). C=100, H=42, ID 80 mm, 2 ply x 191 cm, 6.11 layers. Rows 76-80 superseded - that build did not use the full length and read ~4.8x more resistive.",
+    "spec": "13.5 tog, synthetic polyester fill"
+  },
+  "grey fuzzy": {
+    "D": 0.10869,
+    "C": 0.08002,
+    "alpha": 0.488,
+    "k_layer": 6.54681,
+    "t_layer": 0.28301,
+    "source": "series A+B joint fit; t from a solid 4-ply roll along the 124 cm side, C=42.0",
+    "v_lo": 0.43,
+    "v_hi": 5.06,
+    "product": "https://www.amazon.co.uk/dp/B073HC2G7Q",
+    "size_cm": [
+      124,
+      125
+    ]
+  },
+  "blue holey": {
+    "D": 0.02703,
+    "C": 0.04527,
+    "B": 0.00036,
+    "alpha": 0.6667,
+    "beta": 1.0,
+    "k_layer": 2.8474,
+    "t_layer": 0.2903,
+    "v_lo": 0.94,
+    "v_hi": 11.24,
+    "r2": 0.9912,
+    "worst_v": 10.42,
+    "product": "https://www.amazon.co.uk/dp/B01C8XRV44"
+  },
+  "towel": {
+    "D": 0.05595,
+    "C": 0.01704,
+    "B": 0.01152,
+    "alpha": 0.6667,
+    "beta": 0.6,
+    "k_layer": 3.5894,
+    "t_layer": 0.26995,
+    "v_lo": 1.02,
+    "v_hi": 13.15,
+    "r2": 0.9789,
+    "worst_v": 3.78
+  },
+  "pink": {
+    "D": 0.08474,
+    "C": 0.03837,
+    "alpha": 0.242,
+    "k_layer": 7.0001,
+    "t_layer": 0.4688,
+    "source": "prototype batch 2 (incense)",
+    "v_lo": 0.28,
+    "v_hi": 5.33,
+    "product": "https://www.amazon.co.uk/dp/B082TPFNH7"
+  },
+  "soft linen": {
+    "D": 0.00843,
+    "C": 0.04074,
+    "alpha": 0.666,
+    "k_layer": 6.2927,
+    "t_layer": 0.05141,
+    "source": "4 ply x 192 cm, C=35.5, H=40; t from solid 8-ply roll C=31.5; ID 88.0 mm, 24.33 layers",
+    "v_lo": 0.42,
+    "v_hi": 3.52,
+    "product": "https://www.asda.com/groceries/product/duvet-cover-sets/george-home-grey-striped-soft-touch-reversible-duvet-set-king/7727810"
+  },
+  "_untested": {
+    "blue fuzzy": {
+      "product": "https://www.ikea.com/gb/en/p/klippoxel-throw-grey-turquoise-00584629/",
+      "note": "IKEA KLIPPOXEL throw, grey/turquoise. No data yet."
+    }
+  }
+}

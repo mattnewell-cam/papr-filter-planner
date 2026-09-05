@@ -1,3 +1,12 @@
-_preview.html
-*.py[co]
 __pycache__/
+*.py[cod]
+.venv/
+_preview.html
+
+# Measurement exports are maintained in Google Drive.
+testing/*.xlsx
+testing/prototype_pf_q.csv
+testing/prototype_pf_q.source.json
+
+# Trial refits must be reviewed before replacing the published catalogue.
+testing/fitted_coefficients.json

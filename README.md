@@ -1,49 +1,51 @@
-# PAPR Filter Planner
+# PAPR filter bank
 
-Pick the blankets and towels you actually own, give a pressure budget, an airflow target
-and the space you have, and it returns a rolled-filter build spec that maximises
-protection factor — which material goes at which radius, how to fold each piece, how many
-turns, and what Δp and PF to expect.
+Models, measurements analysis, and design tools for rolled filters made from
+household blankets and towels.
 
-The filtration model is fitted from whole-bundle prototype sweeps, not bench coupons:
-per layer, `log10PF = A·v^-α + C + B·v^β`, with `Δp = k·v`. Flow through a roll is radial,
-so face velocity falls as `v(r) = Q/(2πrH)` and both quantities are integrated over radius.
+| Resource | Contents |
+|---|---|
+| [Live planner](https://mattnewell-cam.github.io/papr-filter-planner/) | Choose materials, airflow, pressure and size limits to calculate a proposed rolled-filter build. |
+| [Planner source](planner/README.md) | Browser app, build script, solver tests, reference cases and material photographs. |
+| [Filter theory](THEORY.md) | Pressure-budget allocation, material mixing and bundle geometry. |
+| [Measured results](testing/RESULTS.md) | Published material fits, test conditions and model limitations. |
+| [Fitting procedure](testing/FITTING.md) | Data preparation, geometry inputs, fitting and plot reproduction. |
+| [Model checks](testing/MODEL_CHECKS.md) | Pressure linearity and measured versus predicted multi-material performance. |
+| [Fit coefficients](testing/coefficients.json) | Published per-layer coefficients and measured velocity ranges. |
+| [Fit plots](testing/plots/) | Filtration, pressure and combined-material comparisons. |
 
-Measurements and fitting notes live in `../testing/`. Constructed multi-material
-builds often underperform single-material-based predictions: measured PF can be
-about half the predicted PF.
-This is an observed, flow-dependent discrepancy, not a universal correction or bound.
+The models use count-based PF at 0.3 µm. Reported quality factors are in kPa⁻¹.
+Constructed multi-material builds can perform below predictions from the individual
+material fits; see the measured results and model checks.
 
-Everything runs in the browser. No backend, no data leaves the page.
+## Measurement data
 
-The optimiser searches material order, folds, quantities and geometry together with
-deterministic differential-evolution populations, followed by local refinement.
-For up to three materials, populations explore every material order explicitly;
-larger selections use four populations that evolve the order as well.
-It includes every allowed fold orientation, permits unused materials, and searches
-one contiguous band per material. Thick folded wraps use whole turns; thin wraps
-allow fractional turns. Scores and budgets come directly from the returned bands.
-Previous feasible plans are retained and rechecked after input changes.
+The source workbook lives in [DIY PAPR Testing on Google Sheets](https://docs.google.com/spreadsheets/d/1vNnPBNcy6AXGmybD3XqS8CLbzuCFn33SeNJbljD8o0Y/edit).
+Workbook and CSV exports are excluded from Git. To run the analyses that use raw
+measurements, download the workbook as `testing/filter_testing.xlsx`, then run:
 
-This is a bounded heuristic, not a proof of a global optimum. Run `node test-solver.cjs`
-for feasibility, repeatability, relaxed-budget and runtime regressions. The 20 quality
-cases must come within 0.006 log10 PF (about 1.4% PF) of longer-search references and
-each finish in under one second on the testing machine. The varied reference inputs
-in `solver-reference.json` were generated with random seed 123 and evaluated with
-eight populations of 1,000 generations; the seven standard cases used ten populations
-of 900 generations. Default and pressure-sensitivity references were strengthened
-using all six material orders and 1,200 generations per population after a pressure
-sensitivity miss revealed that longer runs alone could still converge to one order.
-These references are best-known feasible scores, not upper bounds.
-`node test-solver.cjs --legacy` also compares the previous solver's scores and times;
-its reported scores can include bands it subsequently removed.
-
-## Editing
-
-`src.html` is the source. `index.html` is generated — don't edit it directly.
-
-```
-python build.py && git commit -am "..." && git push
+```sh
+python -m pip install -r testing/requirements.txt
+python testing/export_prototype.py
 ```
 
-GitHub Pages redeploys on push.
+Check the row mapping in `testing/fit_series.json` after changes to the source sheet.
+The manifest and committed plots describe the September 5, 2026 data snapshot.
+The published coefficients predate that refresh; refitting does not automatically
+replace them. The bundle model and theory examples use the published coefficients
+and do not require the workbook export.
+
+## Planner development
+
+```sh
+python planner/build.py
+node planner/test-solver.cjs
+```
+
+Edit `planner/src.html`. The build generates both `planner/index.html` and the root
+`index.html`, preserving the existing GitHub Pages URL. GitHub Pages serves the
+repository root on `main`.
+
+`testing/fill_sheet.gs` is a historical Apps Script for the superseded flat-sheet
+bench analysis, retained for provenance. Current fits use the whole-bundle prototype
+measurements described in `testing/FITTING.md`.

@@ -1,0 +1,104 @@
+{
+  "note": "Mapped to live sheet downloaded 2026-09-05. Spreadsheet row numbers include headers. Only runs above OLD / IGNORE are selected. H is read from column C per row. Geometry is never adjusted to reproduce published coefficients.",
+  "materials": {
+    "grey fuzzy": {
+      "t_layer": 0.28301,
+      "provenance": "Current rows 5-9 only, 3 ply, core ID 65 mm from AF5 and AB formulas. Older two-ply series is now under OLD / IGNORE and excluded. Thickness retains documented solid-roll measurement.",
+      "series": [
+        {
+          "rows": [
+            5,
+            9
+          ],
+          "description_prefix": "Grey fuzzy only, 3 ply",
+          "r_i": 3.25
+        }
+      ]
+    },
+    "grey holey": {
+      "t_layer": 0.20149,
+      "provenance": "coefficients.json: built 2-ply strip along 173 cm side; H=54. Core inferred from recorded outer circumference and cloth cross-section.",
+      "series": [
+        {
+          "rows": [
+            25,
+            28
+          ],
+          "description_prefix": "Grey holey (2)",
+          "stock_cm": 346
+        }
+      ]
+    },
+    "soft linen": {
+      "t_layer": 0.05141,
+      "provenance": "coefficients.json: 4 plies x 192 cm, H=40; thickness from 8-ply solid roll circumference 31.5 cm.",
+      "series": [
+        {
+          "rows": [
+            36,
+            40
+          ],
+          "description_prefix": "Polyester soft-touch linen",
+          "stock_cm": 768
+        }
+      ]
+    },
+    "blue holey": {
+      "t_layer": 0.2903,
+      "provenance": "Sheet row 82: 103 cm double layer plus 49 cm single, same setup as tests; H=39.",
+      "series": [
+        {
+          "rows": [
+            49,
+            54
+          ],
+          "description_prefix": "Blue holey blanket",
+          "stock_cm": 255
+        }
+      ]
+    },
+    "duvet": {
+      "t_layer": 1.95159,
+      "provenance": "Current rows 56-61; 2 plies x 191 cm wrapped length and assumed ID 80 mm retained from the documented full-length build. Effective axial length is 42 cm throughout; Matt corrected C57 in the live sheet on 2026-09-05 and the saved export was refreshed and verified.",
+      "series": [
+        {
+          "rows": [
+            56,
+            61
+          ],
+          "description_prefix": "Duvet",
+          "r_i": 4
+        }
+      ]
+    },
+    "pink": {
+      "t_layer": 0.4688,
+      "provenance": "Current rows 11-15 explicitly say 2 ply. Matt confirmed on 2026-09-05 to take wrapped strip length as 125 cm per ply (250 cm total stock). With recorded outer circumference 42.5 cm and retained per-ply thickness 0.4688 cm, inferred core ID is 58.13 mm; this is calculated, not measured.",
+      "series": [
+        {
+          "rows": [
+            11,
+            15
+          ],
+          "description_prefix": "Pink only",
+          "stock_cm": 250
+        }
+      ]
+    },
+    "towel": {
+      "t_layer": 0.26995,
+      "provenance": "Original user measurement recovered from Claude history, 2026-09-04T00:11:02.857Z: towel is 2 ply 85.5cm length. Original fitting command uses 2 x 85.5 cm stock, circumference 32.5 cm, effective axial length 40 cm, and thickness from separate 4 x 130 cm solid roll of circumference 42 cm. This gives ID 69.46 mm and k 3.5894. The later 130 and 70 cm wrapped-length reconstructions were incorrect; 70 cm came from the planner catalogue, not this test. See FITTING.md for historical provenance.",
+      "series": [
+        {
+          "rows": [
+            42,
+            47
+          ],
+          "description_prefix": "Towel",
+          "stock_cm": 171
+        }
+      ]
+    }
+  },
+  "source_url": "https://docs.google.com/spreadsheets/d/1vNnPBNcy6AXGmybD3XqS8CLbzuCFn33SeNJbljD8o0Y/edit?gid=1848070649#gid=1848070649"
+}
